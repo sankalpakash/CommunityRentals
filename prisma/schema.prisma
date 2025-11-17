@@ -1,0 +1,201 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Society/Community Model
+model Society {
+  id             String   @id @default(cuid())
+  name           String
+  address        String
+  city           String?
+  state          String?
+  blocks         String[] // Array of block names (e.g., ["A", "B", "C"])
+  adminContact   String?
+  adminEmail     String?
+  estimatedUsers Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  users    User[]
+  listings Listing[]
+
+  @@index([name])
+}
+
+// User Model
+model User {
+  id                  String    @id @default(cuid())
+  mobile              String    @unique
+  name                String?
+  email               String?
+  flatNumber          String?
+  block               String?
+  societyId           String?
+  society             Society?  @relation(fields: [societyId], references: [id])
+
+  // Contact Preferences (multi-select: WhatsApp, Call, Email)
+  preferWhatsApp      Boolean   @default(false)
+  preferCall          Boolean   @default(false)
+  preferEmail         Boolean   @default(false)
+
+  // Verification & Status
+  verified            Boolean   @default(false)
+  verifiedAt          DateTime?
+  verifiedBy          String?   // Admin ID who verified
+  status              String    @default("active") // active, blocked, inactive
+
+  // OTP & Authentication
+  otp                 String?
+  otpExpiry           DateTime?
+  otpAttempts         Int       @default(0)
+  otpBlockedUntil     DateTime?
+
+  // Role
+  role                String    @default("user") // user, admin
+
+  // Timestamps
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  lastLoginAt         DateTime?
+
+  // Relations
+  listings            Listing[]
+  contactsAsRenter    Contact[] @relation("RenterContacts")
+  contactsAsOwner     Contact[] @relation("OwnerContacts")
+  flagsCreated        Flag[]    @relation("FlagCreator")
+  flagsReceived       Flag[]    @relation("FlaggedUser")
+
+  @@index([mobile])
+  @@index([societyId])
+  @@index([status])
+}
+
+// Category Model
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  icon        String?   // Icon name or URL
+  color       String?   // Hex color code
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  listings Listing[]
+
+  @@index([name])
+}
+
+// Listing/Product Model
+model Listing {
+  id          String   @id @default(cuid())
+  ownerId     String
+  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Basic Info
+  title       String
+  description String
+  photos      String[] // Array of photo URLs
+
+  // Category
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id])
+
+  // Pricing (daily, weekly, monthly in INR)
+  dailyPrice    Int?
+  weeklyPrice   Int?
+  monthlyPrice  Int?
+
+  // Availability
+  availableFrom DateTime?
+  availableUntil DateTime?
+
+  // Society Info (denormalized for faster queries)
+  societyId   String?
+  society     Society? @relation(fields: [societyId], references: [id])
+
+  // Status: active, paused, pending, rejected, deleted
+  status      String   @default("pending")
+
+  // Moderation
+  rejectionReason String?
+  approvedAt      DateTime?
+  approvedBy      String?   // Admin ID
+
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  contacts Contact[]
+  flags    Flag[]    @relation("FlaggedListing")
+
+  @@index([ownerId])
+  @@index([categoryId])
+  @@index([societyId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Contact/Inquiry Model (tracks when renters contact owners)
+model Contact {
+  id        String   @id @default(cuid())
+
+  renterId  String
+  renter    User     @relation("RenterContacts", fields: [renterId], references: [id], onDelete: Cascade)
+
+  ownerId   String
+  owner     User     @relation("OwnerContacts", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  // Communication method used: whatsapp, call, email
+  method    String
+
+  // Timestamps
+  createdAt DateTime @default(now())
+
+  @@index([renterId])
+  @@index([ownerId])
+  @@index([listingId])
+  @@index([createdAt])
+}
+
+// Flag/Report Model (for moderation)
+model Flag {
+  id          String   @id @default(cuid())
+
+  // What's being flagged
+  listingId   String?
+  listing     Listing? @relation("FlaggedListing", fields: [listingId], references: [id], onDelete: Cascade)
+
+  userId      String?
+  user        User?    @relation("FlaggedUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  // Who flagged it
+  createdById String
+  createdBy   User     @relation("FlagCreator", fields: [createdById], references: [id], onDelete: Cascade)
+
+  // Flag details
+  reason      String   // spam, inappropriate, duplicate, suspicious, other
+  description String?
+  status      String   @default("open") // open, resolved, dismissed
+
+  // Timestamps
+  createdAt   DateTime @default(now())
+  resolvedAt  DateTime?
+  resolvedBy  String?  // Admin ID
+
+  @@index([listingId])
+  @@index([userId])
+  @@index([createdById])
+  @@index([status])
+}
