@@ -8,6 +8,14 @@ const nextConfig = {
       },
     ],
   },
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Mark twilio as external to avoid bundling it
+      config.externals = config.externals || []
+      config.externals.push('twilio')
+    }
+    return config
+  },
 }
 
 module.exports = nextConfig

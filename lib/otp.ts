@@ -30,7 +30,14 @@ export async function sendOTP(mobile: string, otp: string): Promise<boolean> {
 
   try {
     // Import Twilio dynamically only when needed
-    const twilio = require('twilio')
+    let twilio
+    try {
+      twilio = require('twilio')
+    } catch (requireError) {
+      console.error('Twilio module not installed:', requireError)
+      return false
+    }
+
     const client = twilio(accountSid, authToken)
 
     const message = await client.messages.create({

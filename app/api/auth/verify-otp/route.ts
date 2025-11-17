@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
     const mobileValidation = mobileSchema.safeParse(mobile)
     if (!mobileValidation.success) {
       return NextResponse.json(
-        { error: mobileValidation.error.errors[0].message },
+        { error: mobileValidation.error.issues[0].message },
         { status: 400 }
       )
     }
@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const otpValidation = otpSchema.safeParse(otp)
     if (!otpValidation.success) {
       return NextResponse.json(
-        { error: otpValidation.error.errors[0].message },
+        { error: otpValidation.error.issues[0].message },
         { status: 400 }
       )
     }
